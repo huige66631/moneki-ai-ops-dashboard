@@ -4,6 +4,10 @@
 body { margin: 0; min-width: 320px; background: #f5f2ec; }
 button, input { font: inherit; }
 button { cursor: pointer; }
+.filter-bar input:focus-visible, .filter-bar button:focus-visible, .error-state button:focus-visible, .quality-details summary:focus-visible { outline: 2px solid #f1b6a9; outline-offset: 3px; }
+.range-error { flex-basis: 100%; color: #f1b6a9; font-size: 11px; margin: 0; }
+.quality-grid { grid-template-columns: repeat(5, 1fr); }
+@media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
 .app-shell { min-height: 100vh; }
 .topbar { height: 54px; border-bottom: 1px solid #d8d4cb; display: flex; align-items: center; justify-content: space-between; padding: 0 clamp(20px, 5vw, 72px); font-family: 'DM Mono', monospace; font-size: 11px; letter-spacing: .04em; }
 .brand-mark { display: flex; align-items: center; gap: 9px; font-weight: 500; }.brand-dot { width: 9px; height: 9px; background: #d94f3d; border-radius: 50%; }.brand-divider { color: #a5aaa3; }.topbar-meta { color: #68716b; display: flex; align-items: center; gap: 9px; }.live-dot { width: 6px; height: 6px; background: #2f7a5b; border-radius: 50%; }.meta-separator { height: 14px; width: 1px; background: #d8d4cb; }

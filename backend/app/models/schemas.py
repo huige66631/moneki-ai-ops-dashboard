@@ -13,6 +13,7 @@ class Summary(BaseModel):
     revenue: float
     order_count: int
     average_order_value: float | None
+    average_daily_revenue: float
 
 
 class DailyPoint(BaseModel):
@@ -36,6 +37,7 @@ class DataQuality(BaseModel):
     included_record_count: int
     excluded_duplicate_count: int
     excluded_invalid_amount_count: int
+    excluded_invalid_date_count: int
     unmatched_store_count: int
     unmatched_product_count: int
 

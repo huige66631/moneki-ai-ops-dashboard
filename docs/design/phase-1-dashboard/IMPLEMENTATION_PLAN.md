@@ -156,7 +156,8 @@ GET /api/v1/dashboard?start_date=2026-05-01&end_date=2026-07-31
   "summary": {
     "revenue": 0,
     "order_count": 0,
-    "average_order_value": 0
+    "average_order_value": 0,
+    "average_daily_revenue": 0
   },
   "daily": [
     {
@@ -181,13 +182,14 @@ GET /api/v1/dashboard?start_date=2026-05-01&end_date=2026-07-31
     "included_record_count": 0,
     "excluded_duplicate_count": 0,
     "excluded_invalid_amount_count": 0,
+    "excluded_invalid_date_count": 0,
     "unmatched_store_count": 0,
     "unmatched_product_count": 0
   }
 }
 ```
 
-`data_quality` 统计所选日期范围内的记录和质量事件，不作为前端主视觉指标。开发阶段可在折叠区域展示它，方便验证数据口径。`data_quality_events` 保存逐行事件，`data_quality_audit` 保存整次导入的汇总。
+`data_quality` 统计所选日期范围内的记录和质量事件，不作为前端主视觉指标。非法日期没有可用于筛选的日期，`excluded_invalid_date_count` 按最近一次导入的全部非法日期事件统计，并在界面明确标注为“导入”。开发阶段可在折叠区域展示它，方便验证数据口径。`data_quality_events` 保存逐行事件，`data_quality_audit` 保存整次导入的汇总。`summary.average_daily_revenue` 由服务层按所选范围的自然日天数计算，包含无销售日。
 
 同时提供 `GET /api/v1/health`。它返回服务是否存活以及数据库是否已准备好。前端不要依赖该接口显示业务数据。
 

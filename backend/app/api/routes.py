@@ -23,13 +23,16 @@ def connection_dependency():
 
 @router.get("/health", response_model=HealthResponse)
 def health() -> HealthResponse:
+    connection = connect(DB_PATH)
     try:
-        connection = connect(DB_PATH)
-        connection.execute("SELECT 1 FROM sales_facts LIMIT 1")
-        connection.close()
+        row = connection.execute("SELECT 1 FROM sales_facts LIMIT 1").fetchone()
+        if row is None:
+            return HealthResponse(status="degraded", database_ready=False)
         return HealthResponse(status="ok", database_ready=True)
     except sqlite3.Error:
         return HealthResponse(status="degraded", database_ready=False)
+    finally:
+        connection.close()
 
 
 @router.get("/dashboard", response_model=DashboardResponse)

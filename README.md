@@ -29,7 +29,7 @@ data/raw/*.csv -> backend/app/ingestion/load_data.py -> backend/data/moneki.sqli
                                                 -> frontend/src/App.tsx
 ```
 
-后端按 `api / services / ingestion / models` 分层。导入每次清空并重建事实表、维表和数据质量审计表，因此可重复执行，不会在旧库上累加。金额使用整数分保存；负金额保留计入净营业额。重复记录、缺失金额、非正数量和脏外键按 [第一关实施计划](docs/design/phase-1-dashboard/IMPLEMENTATION_PLAN.md) 处理，未匹配商品会显示回退名称。
+后端按 `api / services / ingestion / models` 分层。导入每次在同一事务中清空并重建事实表、维表和数据质量审计表，因此可重复执行，不会在旧库上累加；如果源文件读取失败，旧数据会回滚保留。金额使用整数分保存；负金额保留计入净营业额。重复记录、缺失金额、非法日期、非正数量和脏外键按 [第一关实施计划](docs/design/phase-1-dashboard/IMPLEMENTATION_PLAN.md) 处理，未匹配商品会显示回退名称。看板 API 额外返回服务端计算的日均营业额，并在数据质量折叠区标明导入时排除的非法日期数量。
 
 ## 验证
 

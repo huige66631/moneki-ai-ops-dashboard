@@ -5,7 +5,8 @@ import re
 import sqlite3
 import uuid
 from collections import Counter
-from datetime import date, datetime, timezone
+from contextlib import contextmanager
+from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 
@@ -13,7 +14,21 @@ from app.config import DB_PATH, ROOT_DIR
 from app.db import connect, ensure_schema
 
 DATE_FORMATS = ("%Y-%m-%d", "%Y/%m/%d", "%d-%m-%Y")
-CURRENCY_RE = re.compile(r"[^0-9+\-.]")
+AMOUNT_RE = re.compile(
+    r"^(?P<sign>[+-]?)(?:[\u00a5$\u20ac\u00a3]\s*)?"
+    r"(?P<number>(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?)"
+    r"(?:\s*[\u00a5$\u20ac\u00a3])?$")
+
+
+@contextmanager
+def managed_connection(db_path: Path):
+    connection = connect(db_path)
+    try:
+        ensure_schema(connection)
+        with connection:
+            yield connection
+    finally:
+        connection.close()
 
 
 def normalize_text(value: str | None) -> str:
@@ -40,7 +55,10 @@ def parse_amount_cents(value: str | None) -> tuple[int | None, bool]:
     raw = normalize_text(value)
     if not raw:
         return None, False
-    cleaned = CURRENCY_RE.sub("", raw)
+    match = AMOUNT_RE.fullmatch(raw)
+    if not match:
+        return None, False
+    cleaned = f"{match.group('sign')}{match.group('number').replace(',', '')}"
     try:
         amount = Decimal(cleaned).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     except (InvalidOperation, ValueError):
@@ -65,14 +83,14 @@ def load_data(
 ) -> dict[str, int | str]:
     run_id = uuid.uuid4().hex
     now = datetime.now(timezone.utc).isoformat()
-    connection = connect(db_path)
-    ensure_schema(connection)
-    connection.executescript(
-        "DELETE FROM stores; DELETE FROM products; DELETE FROM sales_facts; "
-        "DELETE FROM data_quality_events; DELETE FROM data_quality_audit;"
-    )
-
-    with connection:
+    with managed_connection(db_path) as connection:
+        # Rebuild inside the same transaction as the inserts so a bad source file
+        # leaves the previous dataset intact instead of leaving a partial database.
+        connection.execute("DELETE FROM stores")
+        connection.execute("DELETE FROM products")
+        connection.execute("DELETE FROM sales_facts")
+        connection.execute("DELETE FROM data_quality_events")
+        connection.execute("DELETE FROM data_quality_audit")
         stores = []
         with (raw_dir / "stores.csv").open("r", encoding="utf-8-sig", newline="") as file:
             for row in csv.DictReader(file):
@@ -141,6 +159,9 @@ def load_data(
                     quality_counts["duplicate"] += 1
                     events.append((run_id, source_line_number, sale_date, "duplicate", 1, now))
                     continue
+                if sale_date is None:
+                    quality_counts["invalid_date"] += 1
+                    events.append((run_id, source_line_number, sale_date, "invalid_date", 1, now))
                 if not amount_is_valid:
                     quality_counts["invalid_amount"] += 1
                     events.append((run_id, source_line_number, sale_date, "invalid_amount", 1, now))
@@ -186,7 +207,6 @@ def load_data(
             "INSERT INTO data_quality_audit(run_id, rule_name, affected_rows, created_at) VALUES (?, ?, ?, ?)",
             [(run_id, rule, count, now) for rule, count in quality_counts.items()],
         )
-    connection.close()
     result: dict[str, int | str] = {"run_id": run_id, "fact_count": len(facts)}
     result.update({f"{key}_count": value for key, value in quality_counts.items()})
     return result

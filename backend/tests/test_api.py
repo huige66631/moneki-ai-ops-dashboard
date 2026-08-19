@@ -72,6 +72,7 @@ def test_dashboard_summary_daily_and_quality(api_client: TestClient):
         "revenue": 43.0,
         "order_count": 6,
         "average_order_value": 7.17,
+        "average_daily_revenue": 14.33,
     }
     assert [point["revenue"] for point in payload["daily"]] == [30.0, 8.0, 5.0]
     assert [point["order_count"] for point in payload["daily"]] == [3, 2, 1]
@@ -81,6 +82,7 @@ def test_dashboard_summary_daily_and_quality(api_client: TestClient):
         "included_record_count": 6,
         "excluded_duplicate_count": 1,
         "excluded_invalid_amount_count": 1,
+        "excluded_invalid_date_count": 0,
         "unmatched_store_count": 1,
         "unmatched_product_count": 2,
     }
@@ -111,6 +113,7 @@ def test_empty_range_has_continuous_zero_points(api_client: TestClient):
         "revenue": 0.0,
         "order_count": 0,
         "average_order_value": None,
+        "average_daily_revenue": 0.0,
     }
     assert [point["date"] for point in payload["daily"]] == [
         "2026-08-01",
@@ -129,6 +132,18 @@ def test_default_range_and_health(api_client: TestClient):
     health = api_client.get("/api/v1/health")
     assert health.status_code == 200
     assert health.json() == {"status": "ok", "database_ready": True}
+
+
+def test_health_reports_empty_database_as_not_ready(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    db = tmp_path / "empty.sqlite3"
+    connection = connect(db)
+    ensure_schema(connection)
+    connection.close()
+    monkeypatch.setattr("app.api.routes.DB_PATH", db)
+
+    response = TestClient(app).get("/api/v1/health")
+    assert response.status_code == 200
+    assert response.json() == {"status": "degraded", "database_ready": False}
 
 
 def test_dashboard_validation(api_client: TestClient):

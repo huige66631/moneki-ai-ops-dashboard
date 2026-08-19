@@ -86,6 +86,12 @@ def build_dashboard(connection: sqlite3.Connection, start_date: date, end_date: 
             }
         )
 
+    average_daily_revenue = (
+        (summary_revenue / Decimal((end_date - start_date).days + 1)).quantize(Decimal("0.01"))
+        if end_date >= start_date
+        else Decimal("0")
+    )
+
     quality = connection.execute(
         "SELECT "
         "SUM(CASE WHEN order_id IS NOT NULL AND amount_is_valid = 1 THEN 1 ELSE 0 END) "
@@ -103,6 +109,9 @@ def build_dashboard(connection: sqlite3.Connection, start_date: date, end_date: 
         "SELECT COUNT(*) AS count FROM data_quality_events WHERE sale_date BETWEEN ? AND ? AND rule_name = 'invalid_amount'",
         params,
     ).fetchone()
+    invalid_date_row = connection.execute(
+        "SELECT COUNT(*) AS count FROM data_quality_events WHERE rule_name = 'invalid_date'",
+    ).fetchone()
 
     return {
         "range": {"start_date": start_date, "end_date": end_date},
@@ -110,6 +119,7 @@ def build_dashboard(connection: sqlite3.Connection, start_date: date, end_date: 
             "revenue": summary_revenue,
             "order_count": summary_orders,
             "average_order_value": _average(summary_revenue, summary_orders),
+            "average_daily_revenue": average_daily_revenue,
         },
         "daily": daily,
         "top_products": top_products,
@@ -117,6 +127,7 @@ def build_dashboard(connection: sqlite3.Connection, start_date: date, end_date: 
             "included_record_count": int(quality["included_record_count"] or 0),
             "excluded_duplicate_count": int(duplicate_row["count"]),
             "excluded_invalid_amount_count": int(invalid_row["count"]),
+            "excluded_invalid_date_count": int(invalid_date_row["count"]),
             "unmatched_store_count": int(quality["unmatched_store_count"] or 0),
             "unmatched_product_count": int(quality["unmatched_product_count"] or 0),
         },
