@@ -9,6 +9,11 @@ from app.config import DB_PATH
 from app.db import connect
 from app.models.schemas import DashboardResponse, HealthResponse
 from app.services.dashboard import build_dashboard, get_date_bounds
+from app.ai.contracts import AskRequest, AssistantResponse
+from app.ai.orchestrator import ask
+from app.ai.providers import DeepSeekProvider, MockProvider
+from app.ai.providers.base import ProviderError
+from app.config import AI_API_KEY, AI_BASE_URL, AI_MODEL, AI_PROVIDER, AI_TIMEOUT_SECONDS
 
 router = APIRouter(prefix="/api/v1")
 
@@ -51,3 +56,27 @@ def dashboard(
     if start_date > end_date:
         raise HTTPException(status_code=422, detail="start_date 不能晚于 end_date。")
     return DashboardResponse.model_validate(build_dashboard(connection, start_date, end_date))
+
+
+def _provider():
+    if AI_PROVIDER == "deepseek":
+        if not AI_API_KEY:
+            raise ProviderError("DeepSeek provider is not configured")
+        return DeepSeekProvider(AI_API_KEY, AI_BASE_URL, AI_MODEL, AI_TIMEOUT_SECONDS)
+    if AI_PROVIDER == "mock":
+        return MockProvider()
+    raise ProviderError("Unknown AI provider")
+
+
+@router.post("/assistant/ask", response_model=AssistantResponse)
+def assistant_ask(
+    request: AskRequest,
+    connection: sqlite3.Connection = Depends(connection_dependency),
+) -> AssistantResponse:
+    bounds = get_date_bounds(connection)
+    if bounds is None:
+        raise HTTPException(status_code=503, detail="数据库尚未导入销售数据。")
+    try:
+        return ask(connection, request, _provider(), bounds)
+    except ProviderError:
+        raise HTTPException(status_code=503, detail="AI 查询暂时不可用，请检查服务配置后重试。")

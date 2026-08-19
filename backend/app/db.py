@@ -55,7 +55,10 @@ CREATE TABLE IF NOT EXISTS data_quality_audit (
 
 def connect(db_path: Path) -> sqlite3.Connection:
     db_path.parent.mkdir(parents=True, exist_ok=True)
-    connection = sqlite3.connect(db_path)
+    # FastAPI may enter a generator dependency and its sync route on different
+    # worker threads; each request still owns its connection, so thread checks
+    # only add a false failure here.
+    connection = sqlite3.connect(db_path, check_same_thread=False)
     connection.row_factory = sqlite3.Row
     return connection
 
