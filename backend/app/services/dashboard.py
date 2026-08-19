@@ -87,11 +87,12 @@ def build_dashboard(connection: sqlite3.Connection, start_date: date, end_date: 
         )
 
     quality = connection.execute(
-        "SELECT COUNT(*) AS included_record_count, "
+        "SELECT "
+        "SUM(CASE WHEN order_id IS NOT NULL AND amount_is_valid = 1 THEN 1 ELSE 0 END) "
+        "AS included_record_count, "
         "SUM(CASE WHEN store_is_matched = 0 THEN 1 ELSE 0 END) AS unmatched_store_count, "
         "SUM(CASE WHEN product_is_matched = 0 THEN 1 ELSE 0 END) AS unmatched_product_count "
-        "FROM sales_facts WHERE sale_date BETWEEN ? AND ? AND sale_date IS NOT NULL "
-        "AND order_id IS NOT NULL AND amount_is_valid = 1",
+        "FROM sales_facts WHERE sale_date BETWEEN ? AND ? AND sale_date IS NOT NULL",
         params,
     ).fetchone()
     duplicate_row = connection.execute(
