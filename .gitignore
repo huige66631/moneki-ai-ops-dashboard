@@ -7,3 +7,7 @@ __pycache__/
 *.py[cod]
 .venv/
 coverage/
+backend/data/*.sqlite3
+backend/data/*.db
+frontend/tsconfig.tsbuildinfo
+.pytest_cache/
