@@ -141,15 +141,15 @@ def test_empty_product_range_reports_verified_zero_without_navigation_guess(cons
             "SELECT COALESCE(SUM(sf.amount_cents), 0) AS revenue_cents FROM sales_facts sf JOIN products p ON p.product_id = sf.product_id "
             "WHERE p.product_name = ? AND sf.sale_date BETWEEN ? AND ? AND sf.sale_date IS NOT NULL "
             "AND sf.order_id IS NOT NULL AND sf.amount_is_valid = 1 AND sf.amount_cents IS NOT NULL",
-            ("Alpha", "2026-08-01", "2026-08-03"),
+            ("Alpha", "2026-05-02", "2026-05-03"),
         ).fetchone()
     finally:
         connection.close()
     with verified_client(consistency_db) as client:
-        payload = client.post("/api/v1/assistant/ask", json={"question": "Alpha 2026年8月1日到2026年8月3日卖了多少钱？"}).json()
+        payload = client.post("/api/v1/assistant/ask", json={"question": "Alpha 2026年5月2日到2026年5月3日卖了多少钱？"}).json()
 
     assert expected["revenue_cents"] == 0
     assert payload["status"] == "answered"
     assert payload["evidence"]["values"]["revenue"] == 0.0
     assert "0.00" in payload["answer"]
-    assert payload["navigation"] == {"start_date": "2026-08-01", "end_date": "2026-08-03", "store_id": None, "reason": "answer_query_range"}
+    assert payload["navigation"] == {"start_date": "2026-05-02", "end_date": "2026-05-03", "store_id": None, "reason": "answer_query_range"}

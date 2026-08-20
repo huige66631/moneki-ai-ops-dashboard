@@ -126,7 +126,7 @@ def test_new_product_question_does_not_inherit_previous_product(tmp_path: Path) 
 
 
 def test_legacy_request_without_session_id_remains_single_turn(api_client):
-    response = api_client.post("/api/v1/assistant/ask", json={"question": "Alpha 2026年5月卖了多少钱？"})
+    response = api_client.post("/api/v1/assistant/ask", json={"question": "Alpha 2026年5月1日到2026年5月3日卖了多少钱？"})
 
     assert response.status_code == 200
     assert response.json()["status"] == "answered"

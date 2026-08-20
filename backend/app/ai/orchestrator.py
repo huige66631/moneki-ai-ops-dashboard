@@ -72,6 +72,14 @@ def ask(
         if dates is None:
             return AssistantResponse(status="needs_clarification", answer="这个日期涉及多个年份或格式不完整，请提供明确的起止日期或年份。", intent=_intent_for_name(plan.name), session_id=session.session_id, provider=provider_info)
         start_date, end_date = dates
+        if start_date < bounds[0] or end_date > bounds[1]:
+            return AssistantResponse(
+                status="needs_clarification",
+                answer=f"当前数据仅覆盖 {bounds[0]} 至 {bounds[1]}，无法核对 {start_date} 至 {end_date} 的销售情况；这不代表该期间营业额为 0。",
+                intent=_intent_for_name(plan.name),
+                session_id=session.session_id,
+                provider=provider_info,
+            )
         if plan.name == "get_category_store_revenue":
             result = get_category_store_revenue(connection, start_date, end_date)
             if not result["winner"]:

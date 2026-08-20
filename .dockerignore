@@ -1,0 +1,12 @@
+.git
+.gitignore
+.pytest_cache
+.runtime
+frontend
+docs
+*.md
+backend/.env
+backend/__pycache__
+backend/app/**/__pycache__
+backend/tests/__pycache__
+backend/data/*.db

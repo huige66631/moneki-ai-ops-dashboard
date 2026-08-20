@@ -11,3 +11,6 @@ backend/data/*.sqlite3
 backend/data/*.db
 frontend/tsconfig.tsbuildinfo
 .pytest_cache/
+.runtime/
+.wrangler/
+worker/.wrangler/

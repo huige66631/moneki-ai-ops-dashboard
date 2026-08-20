@@ -87,6 +87,19 @@ def test_unknown_product_needs_clarification(api_client: TestClient):
     assert payload["tool_call"] is None
 
 
+def test_date_outside_data_bounds_does_not_claim_zero(api_client: TestClient):
+    payload = api_client.post(
+        "/api/v1/assistant/ask",
+        json={"question": "Alpha 2026年4月卖了多少钱？"},
+    ).json()
+
+    assert payload["status"] == "needs_clarification"
+    assert "仅覆盖" in payload["answer"]
+    assert "不代表" in payload["answer"]
+    assert payload["evidence"] is None
+    assert payload["tool_call"] is None
+
+
 def test_provider_failure_returns_safe_503(api_client: TestClient, monkeypatch: pytest.MonkeyPatch):
     def unavailable_provider():
         raise ProviderError("connection timeout")
