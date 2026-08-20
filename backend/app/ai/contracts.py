@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 from typing import Any, Literal
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -24,6 +25,7 @@ class AskContext(BaseModel):
 class AskRequest(BaseModel):
     question: str = Field(min_length=1, max_length=500)
     context: AskContext | None = None
+    session_id: UUID | None = None
 
     @field_validator("question")
     @classmethod
@@ -60,13 +62,21 @@ class ProviderInfo(BaseModel):
     mode: Literal["mock", "live"]
 
 
+class Navigation(BaseModel):
+    start_date: date
+    end_date: date
+    store_id: str | None = None
+    reason: Literal["answer_query_range"] = "answer_query_range"
+
+
 class AssistantResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     status: AnswerStatus
     answer: str
     intent: Intent | None = None
+    session_id: UUID
     tool_call: ToolCall | None = None
     evidence: Evidence | None = None
+    navigation: Navigation | None = None
     provider: ProviderInfo
-

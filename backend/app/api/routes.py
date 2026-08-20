@@ -11,11 +11,13 @@ from app.models.schemas import DashboardResponse, HealthResponse
 from app.services.dashboard import build_dashboard, get_date_bounds
 from app.ai.contracts import AskRequest, AssistantResponse
 from app.ai.orchestrator import ask
+from app.ai.session_store import ConversationStore
 from app.ai.providers import DeepSeekProvider, MockProvider
 from app.ai.providers.base import ProviderError
 from app.config import AI_API_KEY, AI_BASE_URL, AI_MODEL, AI_PROVIDER, AI_TIMEOUT_SECONDS
 
 router = APIRouter(prefix="/api/v1")
+conversation_store = ConversationStore()
 
 
 def connection_dependency():
@@ -77,6 +79,6 @@ def assistant_ask(
     if bounds is None:
         raise HTTPException(status_code=503, detail="数据库尚未导入销售数据。")
     try:
-        return ask(connection, request, _provider(), bounds)
+        return ask(connection, request, _provider(), bounds, conversation_store)
     except ProviderError:
         raise HTTPException(status_code=503, detail="AI 查询暂时不可用，请检查服务配置后重试。")

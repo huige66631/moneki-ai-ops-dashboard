@@ -16,4 +16,4 @@
 
 ## 下一步
 
-填写 `backend/.env` 中的 `MONEKI_AI_API_KEY` 并将 provider 切换为 `deepseek` 后，可手动验证真实模型的工具调用协议。当前自动化测试保持 Mock，不访问网络；第三关部署与生产化运维仍未实现。
+填写 `backend/.env` 中的 `MONEKI_AI_API_KEY` 并将 provider 切换为 `deepseek` 后，可手动验证真实模型的工具调用协议。第三关已在此基础上加入进程内短期会话、日期替换型追问、独立数字一致性测试和显式 dashboard 日期联动；测试仍默认使用 Mock，不访问网络。部署与生产化运维仍未实现。
