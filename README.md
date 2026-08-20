@@ -31,6 +31,18 @@ data/raw/*.csv -> backend/app/ingestion/load_data.py -> backend/data/moneki.sqli
                                                 -> frontend/src/App.tsx + AssistantPanel
 ```
 
+这张图也是项目的任务拆分图：先由 Codex 阅读数据规则并完成导入层，再实现只依赖数据库的报表 API，最后接入 React 看板和可信问答。每一层都先写清输入、输出和验收条件，下一层只使用上一层已经验证的接口。
+
+### 技术选型与理由
+
+- **SQLite**：项目是本地演示，数据量适中；单文件数据库便于重复导入、审计和提交后复现。
+- **FastAPI + Pydantic**：用类型模型固定报表和问答契约，路由只做参数校验，聚合逻辑留在服务层。
+- **React + TypeScript + Vite**：看板需要日期筛选、加载/错误/空数据状态和问答联动；类型检查能尽早发现前后端字段漂移。
+- **ECharts**：趋势图是现成的业务图表，不把时间轴、空日期和 tooltip 逻辑手写在组件里。
+- **白名单查询工具**：AI 只识别问题并选择工具，金额、订单数和日期范围由后端 SQL 决定，避免模型编造数字或生成自由文本 SQL。
+
+具体的 Codex 拆分记录、提示词和修复过程见 [AI_USAGE.md](AI_USAGE.md)；可运行的验收演示见 [DEMO.md](DEMO.md)。
+
 后端按 `api / services / ingestion / models` 分层。导入每次在同一事务中清空并重建事实表、维表和数据质量审计表，因此可重复执行，不会在旧库上累加；如果源文件读取失败，旧数据会回滚保留。金额使用整数分保存；负金额保留计入净营业额。重复记录、缺失金额、非法日期、非正数量和脏外键按 [第一关实施计划](docs/design/phase-1-dashboard/IMPLEMENTATION_PLAN.md) 处理，未匹配商品会显示回退名称。看板 API 额外返回服务端计算的日均营业额，并在数据质量折叠区标明导入时排除的非法日期数量。
 
 ## 验证
