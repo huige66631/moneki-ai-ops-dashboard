@@ -6,12 +6,7 @@
 
 打开线上演示：[https://moneki-dashboard.pages.dev](https://moneki-dashboard.pages.dev)
 
-线上版本说明：
 
-- 前端和看板 API 均通过 Cloudflare Pages 同源访问，避免浏览器请求 `workers.dev`。
-- AI 问答默认使用 DeepSeek 实时识别，不把 DeepSeek Key 放入前端。
-- 当前数据覆盖 `2026-05-01` 至 `2026-07-31`；超出范围的问题会提示“无法核对”，不会把未知数据当成 `0`。
-- 云函数代理地址仅用于后端调用：[DeepSeek proxy](https://tryrevive-d4gzac2aj49df4aa4.service.tcloudbase.com/api/deepseek)
 
 ## 启动
 
