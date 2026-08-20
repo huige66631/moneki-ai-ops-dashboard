@@ -3,6 +3,7 @@ import ReactECharts from 'echarts-for-react'
 import { AlertCircle, ArrowDownRight, ArrowUpRight, CalendarDays, ChevronDown, CircleHelp, RefreshCw } from 'lucide-react'
 import { Dashboard, fetchDashboard } from './lib/api'
 import { AssistantPanel } from './features/assistant/AssistantPanel'
+import { AssistantNavigation } from './features/assistant/assistantTypes'
 
 const money = new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY', maximumFractionDigits: 0 })
 const moneyExact = new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY', minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -23,9 +24,10 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [rangeError, setRangeError] = useState('')
+  const [navigationStatus, setNavigationStatus] = useState('')
   const requestController = useRef<AbortController | null>(null)
 
-  const load = useCallback(async (nextStart?: string, nextEnd?: string) => {
+  const load = useCallback(async (nextStart?: string, nextEnd?: string): Promise<Dashboard | null> => {
     requestController.current?.abort()
     const controller = new AbortController()
     requestController.current = controller
@@ -38,9 +40,11 @@ function App() {
       setEndDate(nextDashboard.range.end_date)
       setDraftStart(nextDashboard.range.start_date)
       setDraftEnd(nextDashboard.range.end_date)
+      return nextDashboard
     } catch (err) {
-      if (err instanceof DOMException && err.name === 'AbortError') return
+      if (err instanceof DOMException && err.name === 'AbortError') return null
       setError(err instanceof Error ? err.message : '接口暂时不可用。')
+      return null
     } finally {
       if (!controller.signal.aborted) setLoading(false)
     }
@@ -65,6 +69,20 @@ function App() {
     void load(draftStart, draftEnd)
   }
 
+  const navigateFromAssistant = useCallback(async (navigation: AssistantNavigation) => {
+    setNavigationStatus('')
+    setDraftStart(navigation.start_date)
+    setDraftEnd(navigation.end_date)
+    const nextDashboard = await load(navigation.start_date, navigation.end_date)
+    if (nextDashboard) setNavigationStatus('看板已按 AI 查询范围更新。')
+  }, [load])
+
+  useEffect(() => {
+    if (!navigationStatus) return
+    const timer = window.setTimeout(() => setNavigationStatus(''), 4500)
+    return () => window.clearTimeout(timer)
+  }, [navigationStatus])
+
   const chartOption = useMemo(() => {
     const daily = dashboard?.daily ?? []
     return {
@@ -82,7 +100,7 @@ function App() {
     <main className="workspace" aria-busy={loading}>
       <section className="intro"><div><p className="kicker">DAILY OPERATING LEDGER</p><h1>经营看板</h1><p className="intro-copy">把营业流水变成今天可以行动的判断。</p></div><div className="range-stamp"><span>当前查看范围</span><strong>{dashboard ? formatDateRange(dashboard.range.start_date, dashboard.range.end_date) : '加载中'}</strong></div></section>
       <form className="filter-bar" onSubmit={apply} noValidate><div className="filter-label"><CalendarDays size={17} strokeWidth={1.7} /><span>筛选日期</span></div><label>起始日期<input type="date" value={draftStart} aria-invalid={Boolean(rangeError)} onChange={e => { setDraftStart(e.target.value); setRangeError('') }} /></label><span className="date-arrow" aria-hidden="true">→</span><label>结束日期<input type="date" value={draftEnd} aria-invalid={Boolean(rangeError)} onChange={e => { setDraftEnd(e.target.value); setRangeError('') }} /></label><button type="submit" disabled={loading}><span>{loading ? '更新中' : '应用筛选'}</span>{loading ? <RefreshCw size={15} className="spin" aria-hidden="true" /> : <ArrowUpRight size={15} aria-hidden="true" />}</button>{rangeError && <p className="range-error" role="alert">{rangeError}</p>}</form>
-      <AssistantPanel startDate={startDate || undefined} endDate={endDate || undefined} />
+      <AssistantPanel startDate={startDate || undefined} endDate={endDate || undefined} navigating={loading} navigationStatus={navigationStatus} onNavigate={navigateFromAssistant} />
       {error ? <div className="state-panel error-state" role="alert"><AlertCircle size={20} aria-hidden="true" /><div><strong>暂时无法读取看板</strong><p>{error}</p></div><button type="button" onClick={() => void load(startDate || undefined, endDate || undefined)}><RefreshCw size={15} aria-hidden="true" /> 重试</button></div> : <>
         <section className="metrics" aria-label="关键指标"><Metric label="净营业额" value={dashboard ? money.format(dashboard.summary.revenue) : '—'} note="所选范围累计" accent /><Metric label="订单数" value={dashboard ? number.format(dashboard.summary.order_count) : '—'} note="去重订单" /><Metric label="客单价" value={dashboard?.summary.average_order_value == null ? '—' : money.format(dashboard.summary.average_order_value)} note="营业额 ÷ 订单数" /></section>
         <section className="evidence-grid"><div className="panel trend-panel"><div className="panel-heading"><div><p className="panel-kicker">01 / FLOW</p><h2>每日营业额</h2></div><div className="heading-note"><span className="legend-line" />净营业额</div></div>{loading && !dashboard ? <div className="chart-placeholder" role="status">正在整理每日流水…</div> : dashboard?.daily.every(point => point.revenue === 0) ? <div className="empty-state"><CircleHelp size={22} aria-hidden="true" /><span>这个日期范围暂无有效营业额。</span></div> : <ReactECharts option={chartOption} style={{ height: 288, width: '100%' }} notMerge lazyUpdate />}</div><aside className="panel readout-panel"><div className="panel-heading"><div><p className="panel-kicker">READOUT</p><h2>范围摘要</h2></div><ChevronDown size={17} className="muted-icon" aria-hidden="true" /></div><div className="readout-list"><div><span>覆盖天数</span><strong>{dashboard ? dashboard.daily.length : '—'} <small>天</small></strong></div><div><span>日均营业额</span><strong>{dashboard ? money.format(dashboard.summary.average_daily_revenue) : '—'}</strong></div><div><span>高峰日</span><strong>{dashboard?.daily.length ? dashboard.daily.reduce((peak, point) => point.revenue > peak.revenue ? point : peak, dashboard.daily[0]).date.slice(5).replace('-', '/') : '—'}</strong></div></div><div className="readout-foot"><span className="pulse-icon" /> 包含无销售日期，以 ¥0 计入趋势</div></aside></section>

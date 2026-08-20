@@ -1,11 +1,17 @@
 import { FormEvent, useEffect, useRef, useState } from 'react'
-import { AlertCircle, ArrowUpRight, Check, ChevronDown, MessageSquare, RefreshCw } from 'lucide-react'
+import { AlertCircle, ArrowUpRight, CalendarDays, Check, ChevronDown, MessageSquare, RefreshCw } from 'lucide-react'
 import { askAssistant } from './assistantApi'
-import { AssistantResponse } from './assistantTypes'
+import { AssistantNavigation, AssistantResponse } from './assistantTypes'
 
 const examples = ['哪个品类的门店营业额最高？', '牛肉poke 六月卖了多少钱？', '客单价最近是涨了还是跌了？']
 
-type Props = { startDate?: string; endDate?: string }
+type Props = {
+  startDate?: string
+  endDate?: string
+  navigating?: boolean
+  navigationStatus?: string
+  onNavigate?: (navigation: AssistantNavigation) => void
+}
 
 const evidenceLabels: Record<string, string> = {
   revenue: '净营业额',
@@ -33,23 +39,20 @@ function formatEvidenceValue(key: string, value: unknown): string {
   return String(value)
 }
 
-export function AssistantPanel({ startDate, endDate }: Props) {
+function formatRange(startDate: string, endDate: string) {
+  return `${startDate.replaceAll('-', '.')} — ${endDate.replaceAll('-', '.')}`
+}
+
+export function AssistantPanel({ startDate, endDate, navigating = false, navigationStatus, onNavigate }: Props) {
   const [question, setQuestion] = useState('')
-  const [response, setResponse] = useState<AssistantResponse | null>(null)
+  const [pinnedResponse, setPinnedResponse] = useState<AssistantResponse | null>(null)
+  const [sessionId, setSessionId] = useState<string>()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [showEvidence, setShowEvidence] = useState(false)
   const controller = useRef<AbortController | null>(null)
 
-  useEffect(() => {
-    controller.current?.abort()
-    controller.current = null
-    setLoading(false)
-    setResponse(null)
-    setError('')
-    setShowEvidence(false)
-    return () => controller.current?.abort()
-  }, [startDate, endDate])
+  useEffect(() => () => controller.current?.abort(), [])
 
   const submit = async (event?: FormEvent, submittedQuestion?: string) => {
     event?.preventDefault()
@@ -60,11 +63,11 @@ export function AssistantPanel({ startDate, endDate }: Props) {
     controller.current = nextController
     setLoading(true)
     setError('')
-    setResponse(null)
     setShowEvidence(false)
     try {
-      const next = await askAssistant(value, startDate && endDate ? { start_date: startDate, end_date: endDate } : undefined, nextController.signal)
-      setResponse(next)
+      const next = await askAssistant(value, startDate && endDate ? { start_date: startDate, end_date: endDate } : undefined, sessionId, nextController.signal)
+      setPinnedResponse(next)
+      setSessionId(next.session_id)
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return
       setError(err instanceof Error ? err.message : '对话服务暂时不可用。')
@@ -73,13 +76,15 @@ export function AssistantPanel({ startDate, endDate }: Props) {
     }
   }
 
-  const statusLabel = response?.status === 'answered' ? '已核对' : response?.status === 'needs_clarification' ? '需要补充' : '暂不支持'
-  const providerLabel = response?.provider.name === 'mock' ? '本地 Mock' : 'DeepSeek'
+  const statusLabel = pinnedResponse?.status === 'answered' ? '已核对' : pinnedResponse?.status === 'needs_clarification' ? '需要补充' : '暂不支持'
+  const providerLabel = pinnedResponse?.provider.name === 'mock' ? '本地 Mock' : 'DeepSeek'
+  const answerRange = pinnedResponse?.navigation
+  const currentRangeMatchesAnswer = Boolean(answerRange && answerRange.start_date === startDate && answerRange.end_date === endDate)
 
   return <section className="assistant-panel" aria-label="AI 数据问答">
     <div className="assistant-heading">
       <div className="assistant-title"><span className="assistant-icon"><MessageSquare size={17} aria-hidden="true" /></span><div><p className="panel-kicker">03 / VERIFIED QA</p><h2>问问经营数据</h2></div></div>
-      <span className="assistant-scope">基于当前日期范围</span>
+      <span className="assistant-scope">提问默认使用看板范围</span>
     </div>
     <form className="assistant-form" onSubmit={submit}>
       <input value={question} onChange={event => setQuestion(event.target.value)} placeholder="例如：哪个品类的门店营业额最高？" aria-label="输入经营数据问题" maxLength={500} />
@@ -87,6 +92,6 @@ export function AssistantPanel({ startDate, endDate }: Props) {
     </form>
     <div className="assistant-examples" aria-label="示例问题">{examples.map(example => <button type="button" key={example} onClick={() => { setQuestion(example); void submit(undefined, example) }}>{example}</button>)}</div>
     {error && <div className="assistant-result assistant-error" role="alert"><AlertCircle size={17} aria-hidden="true" /><span>{error}</span><button type="button" onClick={() => void submit()}><RefreshCw size={14} aria-hidden="true" /> 重试</button></div>}
-    {response && <div className={`assistant-result assistant-${response.status}`} role="status"><div className="assistant-result-top"><span className="assistant-status">{response.status === 'answered' && <Check size={13} aria-hidden="true" />}{statusLabel}</span><span className="assistant-provider">{providerLabel} · {response.evidence ? '已执行白名单查询' : '未提供查询证据'}</span></div><p className="assistant-answer">{response.answer}</p>{response.evidence && <details open={showEvidence} onToggle={event => setShowEvidence((event.currentTarget as HTMLDetailsElement).open)} className="assistant-evidence"><summary>查看查询依据 <ChevronDown size={14} aria-hidden="true" /></summary><div className="evidence-copy"><span>{response.evidence.summary}</span><span>{Object.entries(response.evidence.filters).map(([key, value]) => `${evidenceLabels[key] || key}: ${value}`).join(' · ')}</span><span>{Object.entries(response.evidence.values).map(([key, value]) => `${evidenceLabels[key] || key}: ${formatEvidenceValue(key, value)}`).join(' · ')}</span></div></details>}</div>}
+    {pinnedResponse && <div className={`assistant-result assistant-${pinnedResponse.status}`} role="status"><div className="assistant-result-top"><span className="assistant-status">{pinnedResponse.status === 'answered' && <Check size={13} aria-hidden="true" />}{statusLabel}</span><span className="assistant-provider">{providerLabel} · {pinnedResponse.evidence ? '已执行白名单查询' : '未提供查询证据'}</span></div><p className="assistant-answer">{pinnedResponse.answer}</p>{answerRange && <div className="assistant-query-range"><span><CalendarDays size={14} aria-hidden="true" />此回答查询范围：{formatRange(answerRange.start_date, answerRange.end_date)}</span>{!currentRangeMatchesAnswer && onNavigate && <button type="button" onClick={() => onNavigate(answerRange)} disabled={navigating} aria-label={`查看 AI 查询范围 ${answerRange.start_date} 至 ${answerRange.end_date}`}><CalendarDays size={14} aria-hidden="true" />{navigating ? '正在更新看板' : '查看此范围'}</button>}</div>}{navigationStatus && <p className="assistant-navigation-status"><Check size={14} aria-hidden="true" />{navigationStatus}</p>}{pinnedResponse.evidence && <details open={showEvidence} onToggle={event => setShowEvidence((event.currentTarget as HTMLDetailsElement).open)} className="assistant-evidence"><summary>查看查询依据 <ChevronDown size={14} aria-hidden="true" /></summary><div className="evidence-copy"><span>{pinnedResponse.evidence.summary}</span><span>{Object.entries(pinnedResponse.evidence.filters).map(([key, value]) => `${evidenceLabels[key] || key}: ${value}`).join(' · ')}</span><span>{Object.entries(pinnedResponse.evidence.values).map(([key, value]) => `${evidenceLabels[key] || key}: ${formatEvidenceValue(key, value)}`).join(' · ')}</span></div></details>}</div>}
   </section>
 }
